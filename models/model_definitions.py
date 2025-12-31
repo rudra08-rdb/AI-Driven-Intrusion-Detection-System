@@ -1,51 +1,47 @@
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
+import numpy as np
+from model_definitions import IDSModelHybrid
 
-class IDSModelHybrid(nn.Module):
-    def __init__(self, seq_len, feat_dim, num_classes, use_attention=True):
-        super().__init__()
-        self.seq_len = seq_len
-        self.feat_dim = feat_dim
-        self.num_classes = num_classes
-        self.use_attention = use_attention
+# ---------------- CONFIG ----------------
+SEQ_LEN = 1               # single flow treated as 1 timestep
+FEAT_DIM = 78             # CICIDS numeric features
+NUM_CLASSES = 15
+MODEL_PATH = "trained_ids_model.pth"
 
-        # CNN feature extractor
-        self.conv1 = nn.Conv1d(in_channels=feat_dim, out_channels=128, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm1d(128)
-        self.conv2 = nn.Conv1d(128, 256, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm1d(256)
-        self.dropout = nn.Dropout(0.3)
+# ---------------- LOAD MODEL ----------------
+def load_model():
+    model = IDSModelHybrid(
+        seq_len=SEQ_LEN,
+        feat_dim=FEAT_DIM,
+        num_classes=NUM_CLASSES,
+        use_attention=True
+    )
 
-        # LSTM temporal model
-        self.lstm = nn.LSTM(input_size=256, hidden_size=128, num_layers=1, batch_first=True, bidirectional=True)
+    state = torch.load(MODEL_PATH, map_location="cpu")
+    model.load_state_dict(state)
+    model.eval()
+    return model
 
-        # Optional attention
-        if use_attention:
-            self.attn = nn.Linear(128 * 2, 1)
+# ---------------- PREDICT ----------------
+def predict(model, feature_vector):
+    """
+    feature_vector: numpy array of shape (78,)
+    """
 
-        # Classification head
-        self.fc = nn.Sequential(
-            nn.Linear(128 * 2, 128),
-            nn.ReLU(),
-            nn.Dropout(0.3),
-            nn.Linear(128, num_classes)
-        )
+    x = np.array(feature_vector, dtype=np.float32)
+    x = x.reshape(1, SEQ_LEN, FEAT_DIM)  # (batch, seq, feat)
 
-    def forward(self, x):
-        # x: (batch, seq, feat)
-        x = x.permute(0, 2, 1)           # (batch, feat, seq)
-        x = F.relu(self.bn1(self.conv1(x)))
-        x = F.relu(self.bn2(self.conv2(x)))
-        x = x.permute(0, 2, 1)           # (batch, seq, 256)
+    x_tensor = torch.tensor(x)
 
-        lstm_out, _ = self.lstm(x)       # (batch, seq, 256)
-        if self.use_attention:
-            attn_weights = torch.softmax(self.attn(lstm_out), dim=1)
-            context = torch.sum(attn_weights * lstm_out, dim=1)
-        else:
-            context = torch.mean(lstm_out, dim=1)
-            attn_weights = None
+    with torch.no_grad():
+        logits, _, attn = model(x_tensor)
+        probs = torch.softmax(logits, dim=1)
 
-        out = self.fc(context)
-        return out, out, attn_weights
+        pred_class = torch.argmax(probs, dim=1).item()
+        confidence = probs[0, pred_class].item()
+
+    return {
+        "prediction": pred_class,
+        "confidence": confidence,
+        "attention": attn
+    }
