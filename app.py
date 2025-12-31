@@ -4,7 +4,14 @@ import datetime
 import matplotlib.pyplot as plt
 import os
 
+from services.explainability import explain_prediction
 from services.inference import load_model, predict
+
+page = st.sidebar.radio(
+    "Navigation",
+    ["Detection", "Explainability"]
+)
+
 
 # ------------------ PAGE CONFIG ------------------
 st.set_page_config(
@@ -112,3 +119,52 @@ if uploaded_file:
                     f"{pred},"
                     f"{conf:.4f}\n"
                 )
+
+if page == "Detection":
+    # existing detection code
+
+if page == "Explainability":
+
+    st.subheader("Explain Model Decision (SHAP)")
+
+    if uploaded_file is None:
+        st.info("Upload a CSV file first to enable explainability.")
+    else:
+        numeric_df = df.select_dtypes(include="number")
+
+        if numeric_df.shape[1] != 78:
+            st.warning("Invalid feature count for explainability.")
+        else:
+            st.write("Select a row to explain:")
+            row_index = st.number_input(
+                "Row index",
+                min_value=0,
+                max_value=len(numeric_df) - 1,
+                value=0
+            )
+
+            sample = numeric_df.iloc[row_index].values.reshape(1, -1)
+
+            background = numeric_df.sample(
+                min(50, len(numeric_df)),
+                random_state=42
+            ).values
+
+            with st.spinner("Generating SHAP explanation..."):
+                shap_values = explain_prediction(
+                    model,
+                    background,
+                    sample
+                )
+
+            st.success("Explanation generated.")
+
+            shap.summary_plot(
+                shap_values,
+                sample,
+                plot_type="bar",
+                show=False
+            )
+            st.pyplot(bbox_inches="tight")
+
+
