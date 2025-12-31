@@ -4,8 +4,8 @@ import datetime
 import matplotlib.pyplot as plt
 import os
 
-from services.explainability import explain_prediction
 from services.inference import load_model, predict
+from services.explainability import explain_prediction
 
 page = st.sidebar.radio(
     "Navigation",
