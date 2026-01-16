@@ -1,46 +1,59 @@
 import torch
-import numpy as np
+import os
 from model_definitions import IDSModelHybrid
 
-SEQ_LEN = 1
-FEAT_DIM = 78
-NUM_CLASSES = 15
+# ------------------ CONFIG ------------------
 MODEL_PATH = "trained_ids_model.pth"
+NUM_FEATURES = 78
+NUM_CLASSES = 15
+SEQ_LEN = 1
 
+# ------------------ LOAD MODEL ------------------
 def load_model():
+    if not os.path.exists(MODEL_PATH):
+        raise FileNotFoundError(
+            f"Model file not found at {MODEL_PATH}"
+        )
+
+    # Rebuild model architecture
     model = IDSModelHybrid(
         seq_len=SEQ_LEN,
-        feat_dim=FEAT_DIM,
+        feat_dim=NUM_FEATURES,
         num_classes=NUM_CLASSES,
         use_attention=True
     )
 
-    state = torch.load(
+    # Load FULL model safely
+    checkpoint = torch.load(
         MODEL_PATH,
-        map_location="cpu",
-        weights_only=True
+        map_location="cpu"
     )
 
-    model.load_state_dict(state)
+    # If full model was saved
+    if isinstance(checkpoint, torch.nn.Module):
+        model = checkpoint
+    else:
+        model.load_state_dict(checkpoint)
+
     model.eval()
     return model
 
 
-def predict(model, feature_vector):
-    x = np.array(feature_vector, dtype=np.float32)
-    x = x.reshape(1, SEQ_LEN, FEAT_DIM)
-    x_tensor = torch.tensor(x)
+# ------------------ PREDICT ------------------
+def predict(model, features):
+    x = torch.tensor(features, dtype=torch.float32)
+    x = x.view(1, 1, -1)  # (batch, seq, features)
 
     with torch.no_grad():
-        logits, _, attn = model(x_tensor)
+        logits, _, _ = model(x)
         probs = torch.softmax(logits, dim=1)
 
-    pred = torch.argmax(probs, dim=1).item()
-    conf = probs[0, pred].item()
+    pred = int(torch.argmax(probs, dim=1).item())
+    confidence = float(torch.max(probs).item())
 
     return {
         "prediction": pred,
-        "confidence": conf,
-        "attention": attn
+        "confidence": confidence
     }
+
 
