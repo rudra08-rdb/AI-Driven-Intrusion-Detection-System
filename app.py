@@ -6,7 +6,6 @@ import os
 
 from services.inference import load_model, predict
 
-# ------------------ PAGE CONFIG ------------------
 st.set_page_config(
     page_title="AI Intrusion Detection System",
     layout="wide"
@@ -14,7 +13,6 @@ st.set_page_config(
 
 st.title("AI-Driven Intrusion Detection System")
 
-# ------------------ LOAD MODEL ------------------
 @st.cache_resource
 def get_model():
     return load_model()
@@ -29,9 +27,8 @@ ATTACK_LABELS = [
     "Web_Attack_XSS", "Web_Attack_SQLInjection"
 ]
 
-# ------------------ FILE UPLOAD ------------------
 uploaded_file = st.file_uploader(
-    "Upload CICIDS2017 CSV",
+    "Upload CICIDS2017 CSV File",
     type="csv"
 )
 
@@ -43,7 +40,7 @@ if uploaded_file:
     numeric_df = df.select_dtypes(include="number")
 
     if numeric_df.shape[1] != 78:
-        st.error(f"Expected 78 features, found {numeric_df.shape[1]}")
+        st.error(f"Expected 78 numeric features, found {numeric_df.shape[1]}")
         st.stop()
 
     predictions = []
@@ -77,6 +74,7 @@ if uploaded_file:
     with open("logs/alerts.log", "a") as f:
         for p, c in zip(predictions, confidences):
             f.write(f"{datetime.datetime.now()},{p},{c:.4f}\n")
+
 
 
 
