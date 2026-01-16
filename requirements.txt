@@ -3,7 +3,5 @@ pandas
 numpy
 scikit-learn
 matplotlib
-torch==2.1.2
-
-
+torch --index-url https://download.pytorch.org/whl/cpu
 
