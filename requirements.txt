@@ -1,8 +1,9 @@
-torch==2.2.2
-numpy
-pandas
-scikit-learn
 streamlit
+pandas
+numpy
+scikit-learn
 matplotlib
 shap
+torch==2.1.2
+
 
